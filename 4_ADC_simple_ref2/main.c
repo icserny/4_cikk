@@ -181,7 +181,7 @@ int32_t temp;
 //--- Chan 10 a belsõ hõmérõ ----------------------------------    
     data = ADC_single_meas_REF2_5V(INCH_10);
     sw_uart_out4hex(data);    
-    temp = ((uint32_t)data*1762L - 711040L) >> 8;   
+    temp = ((uint32_t)data*1762L - 711030L) >> 8;   
     sw_uart_puts(" temp = ");
     sw_uart_outdec(temp,1);            //Kiírás 1 tizedesre
     sw_uart_puts(" C");   

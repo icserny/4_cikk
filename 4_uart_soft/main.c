@@ -45,8 +45,8 @@ void delay_ms(uint16_t delay) {
 
 /**----------------------------------------------
  *   Egy karakter kiküldése a soros portra
- *   SW_UART: 2400 bit/s, 8, N, 1 formátum
- *   DCO = 1 MHz (Bitidõ = 416,667 usec)
+ *   SW_UART: 9600 bit/s, 8, N, 1 formátum
+ *   DCO = 1 MHz (Bitidõ = 104,17 usec)
  *-----------------------------------------------
  * c - a kiküldeni kívánt karakter kódja
  */
@@ -62,7 +62,7 @@ void sw_uart_putc(char c) {
       P1OUT &= ~TXD;              //Ha '0'
     }
     TXData = TXData >> 1;         //Adatregiszter léptetés jobbra
-    __delay_cycles(402);          //<== Itt kell hangolni!
+    __delay_cycles(89);          //<== Itt kell hangolni!
   }
   P1OUT |= TXD;                   //Az alaphelyzet: mark
 }

@@ -183,7 +183,7 @@ int32_t temp;
 //--- Az A10 csatorna (hõmérõ) mérése és kiíratása -------------    
     data = ADC_single_meas(INCH_10);
     sw_uart_out4hex(data);   
-    temp = ((uint32_t)data*2467L - 711040L) >> 8; //tizedfok egységben
+    temp = ((uint32_t)data*2467L - 711030L) >> 8; //tizedfok egységben
     sw_uart_puts(" temp = ");
     sw_uart_outdec(temp,1);            //kiíratás egy tizedesjegyre
     sw_uart_puts(" C");     

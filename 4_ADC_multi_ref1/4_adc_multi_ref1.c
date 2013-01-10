@@ -1,9 +1,11 @@
 /**********************************************************************
  *  Launchpad demóprogram: ADC_multi_ref1
  *
- * Ismételt egycsatornás mérések ADC-vel, és az 1,5 V-os belsõ referencia 
- * használatával. Az A5 (P1.5 láb) analóg bemenetre 0 - 1,5 V közötti jelet vigyünk.
- * Emellett megmérjük a belsõ hõmérõ jelét is (Chan 10).
+ * Ismételt egycsatornás mérések ADC-vel, 1,5 V-os belsõ referenciával. 
+ * Az A5 (P1.5 láb) analóg bemenetre egy TC1047A típusú analóg hõmérõ
+ * jelét, vagy más, 0 - 1,5 V közötti feszültséget kössünk.
+ * Emellett megmérjük a belsõ hõmérõ jelét is (Chan 10). A csatornánkénti
+ * mérések számát az NDATA makró definíciójában adhatjuk meg.
  *
  * A mérés eredményeit egyirányú szoftveres UART kezeléssel (csak adatküldés) 
  * kiíratjuk. Paraméterek: 9600 baud, 8 adatbit, nincs paritásbit, 2 stopbit
@@ -36,8 +38,8 @@
 #include "stdint.h"
 
 #define TXD       BIT1                 //TXD a P1.1 lábon
-
-uint16_t adc_data[64];                 //Ide kerülnek a mérési adatok
+#define NDATA     32                   //Adatok száma
+uint16_t adc_data[NDATA];              //Ide kerülnek a mérési adatok
 
 /*-------------------------------------------------------------
  * Sorozat mérés egy ADC csatornában, 1,5 V a belsõ referencia
@@ -194,23 +196,23 @@ int32_t temp;
 //--- Analóg csatornák engedélyezése --------------------------
   ADC10AE0 |= BIT5;                    //P1.5 legyen analóg bemenet
   while(1) {
-    delay_ms(1000);
-    ADC_multi_meas_REF1_5V(INCH_5,adc_data,64);
-    data = avg(adc_data,64);
+    delay_ms(1000);                    //1 s várakozás 
+    ADC_multi_meas_REF1_5V(INCH_5,adc_data,NDATA);  //A5 csatorna mérése
+    data = avg(adc_data,NDATA);        //A5 mérési eredményeinek átlagolása  
     sw_uart_puts("chan 5 = ");
     sw_uart_out4hex(data);
     temp = (int32_t)data*1500L/1023;   //A mV-okban mért feszültség
     sw_uart_outdec(temp,3);            //kiírás 3 tizedesre
     sw_uart_puts("V temp = ");
-    sw_uart_outdec(temp-500L,1);
+    sw_uart_outdec(temp-500L,1);       //A TC1047A hõmérsékekletének kiírása 
     sw_uart_puts("C chan 10 = ");      
-    ADC_multi_meas_REF1_5V(INCH_10,adc_data,64);
-    data = avg(adc_data,64);    
+    ADC_multi_meas_REF1_5V(INCH_10,adc_data,NDATA); //belsõ hõmérõ  
+    data = avg(adc_data,NDATA);        //Adatok átlagolása 
     sw_uart_out4hex(data);   
-    temp = ((uint32_t)data*270687L - 182026240L) >> 16;  
+    temp = ((int32_t)data*270687L - 182023932L) >> 16;  
     sw_uart_puts(" temp = "); 
-    sw_uart_outdec(temp,1);       
+    sw_uart_outdec(temp,1);            //A belsõ hõmérséklet kiíratása
     sw_uart_puts(" C\r\n");   
-    delay_ms(1000);    
+    delay_ms(1000);                    //1 s várakozás    
   }
 }

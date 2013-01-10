@@ -1,9 +1,14 @@
 /**********************************************************************
- *  Launchpad demóprogram: ADC_simple_ref1
+ *  Launchpad demóprogram: ADC_multi2_ref1
  *
- * Egyszerû mérés ADC-vel, az 1,5 V-os belsõ referencia használatával.
- * Az A5 (P1.5 láb) analóg bemenetre 0 - 1,5 V közötti jelet vigyünk.
- * Emellett megmérjük a belsõ hõmérõ jelét is (Chan 10).
+ * Ismételt egycsatornás mérések ADC-vel, 1,5 V-os belsõ referenciával.
+ * Az ADC-t Timer0 CCR0 csatornájának kimenõjele triggereli. 
+ * A mintavételi frekvenciát úgy választottuk meg (~ 500 Hz), hogy 
+ * az esetleges 50 Hz-es zajt kiátlagolhassuk.
+ * Az A5 (P1.5 láb) analóg bemenetre egy TC1047A típusú analóg hõmérõ
+ * jelét, vagy más, 0 - 1,5 V közötti feszültséget kössünk.
+ * Emellett megmérjük a belsõ hõmérõ jelét is (Chan 10). A csatornánkénti
+ * mérések számát az NDATA makró definíciójában adhatjuk meg.
  *
  * A mérés eredményeit egyirányú szoftveres UART kezeléssel (csak adatküldés) 
  * kiíratjuk. Paraméterek: 9600 baud, 8 adatbit, nincs paritásbit, 2 stopbit
@@ -35,26 +40,39 @@
 #include "io430.h"
 #include "stdint.h"
 
-#define TXD       BIT1                 // TXD a P1.1 lábon
+#define TXD       BIT1                 //TXD a P1.1 lábon
+#define NDATA     32                   //Adatok száma
+uint16_t adc_data[NDATA];              //Ide kerülnek a mérési adatok
 
 /*-------------------------------------------------------------
- * Egyszeri mérés egy ADC csatornában, 1,5 V a belsõ referencia
+ * Sorozat mérés egy ADC csatornában, 1,5 V a belsõ referencia
+ * Feltételezzük, hogy külsõ jel mérése esetén az analóg funkció
+ * már engedélyezve van (az ADC10AE0 regiszterben).
  *-------------------------------------------------------------
  * chan - csatornaválasztó bitek (a csatorna sorszáma << 12)
+ * pbuf - a mérési adatok tárhelyének címe
+ * ndat - az egy sorozatban elvégzendõ mérések száma
  */
-uint16_t ADC_single_meas_REF1_5V(uint16_t chan) {
+void ADC_multi_meas_REF1_5V(uint16_t chan, uint16_t *pbuf, uint8_t ndat) {
   ADC10CTL0 &= ~ENC;                   //Az ADC letiltása újrakonfiguráláshoz
+    while (ADC10CTL1 & BUSY);          //Várakozás a foglaltság végére
   ADC10CTL0 = ADC10SHT_3               //mintavétel: 64 óraütés
              | ADC10ON                 //Az ADC bekapcsolása
              | SREF_1                  //VR+ = VREF+ és VR- = AVSS
-             | REFON;                  //Belsõ referencia bekapcsolása
+             | REFON                   //Belsõ referencia bekapcsolása
+             | ADC10IE;                //Programmegszakítás engedélyezése
                                        //1,5 V-os referencia kiválasztása
-  ADC10CTL1 = ADC10SSEL_0 + chan;      //csatorna = 'chan', ADC10OSC az órajel
-  ADC10CTL0 |= ENC + ADC10SC;          //Konverzió engedélyezése és indítása
-  while (ADC10CTL1 & BUSY);            //Várakozás a konverzió végére
-  return ADC10MEM;                     //Visszatérés a konverzió eredményével 
+  ADC10CTL1 = ADC10SSEL_0              //csatorna = 'chan', ADC10OSC az órajel
+             | SHS_2                   //Hardveres triggerelés (TA0.0)  
+             | CONSEQ_2                //Ismételt egycsatornás konverzió
+             | chan;                   //Az analóg csatorna kiválasztása   
+  ADC10DTC0 &= ~(ADC10TB+ADC10CT);     //Egy blokk mód
+  ADC10DTC1 = ndat;                    //ndat mérést végzünk  
+  ADC10SA = (unsigned short)pbuf;      //adatok mentése a mutatóval jelzett helyre 
+  ADC10CTL0 |= ENC;                    //Konverzió engedélyezése
+   __low_power_mode_0();               //CPU altatás a méréssorozat végéig
+  ADC10CTL0 &= ~ENC;                   //Az ADC letiltása újrakonfiguráláshoz   
 }
-
 
 /**------------------------------------------------------------
  *   Késleltetõ eljárás (1 - 65535 ms)
@@ -91,8 +109,6 @@ void sw_uart_putc(char c) {
   }
   P1OUT |= TXD;                   //Az alaphelyzet: mark
 }
-
-
 
 /**------------------------------------------------------------
  *  Karakterfüzér kiírása a soros portra
@@ -155,12 +171,26 @@ void sw_uart_outdec(int32_t data, uint8_t ndigits) {
     } while(i);
 }
 
+/**------------------------------------------------------------
+ * Adatok átlagolása (számtani közép)
+ *-------------------------------------------------------------
+ * pbuf - az adtok tárhelyének címe
+ * n - az átlagolni kívánt adatok száma
+ */
+uint16_t avg(uint16_t *pbuf, uint8_t n) {
+  uint8_t i;
+  uint16_t sum;
+  sum = 0;
+  for(i=0; i<n; i++) sum += *pbuf++;
+  return (sum/n);
+}  
+
 void main(void) {
 uint16_t data;
 int32_t temp;
   WDTCTL = WDTPW + WDTHOLD;            //Letiltjuk a watchdog idõzítõt
-  DCOCTL = CALDCO_1MHZ;                // DCO beállítása a gyárilag kalibrált 
-  BCSCTL1 = CALBC1_1MHZ;               // 1 MHz-es frekvenciára  
+  DCOCTL = CALDCO_1MHZ;                //DCO beállítása a gyárilag kalibrált 
+  BCSCTL1 = CALBC1_1MHZ;               //1 MHz-es frekvenciára  
   P1DIR |= TXD;                        //TXD legyen digitális kimenet
   P1OUT |= TXD;                        //TXD alaphelyzete: mark
 //--- P1.3 belsõ felhúzás engedélyezése -----------------------  
@@ -169,20 +199,40 @@ int32_t temp;
   P1REN |= BIT3;                       //Belsõ felhúzás engedélyezése   
 //--- Analóg csatornák engedélyezése --------------------------
   ADC10AE0 |= BIT5;                    //P1.5 legyen analóg bemenet
+//-- Timer_A beállítása: OUT0=500 Hz, SMCLK, "Felfelé számlálás"
+    TACCR0 = 999;                      //A periódusidõ 1000 Hz
+    TACCTL0 = OUTMOD_4;                //Toggle mód (OUT0 500 Hz lesz)
+    TACTL = TASSEL_2 |                 //SMCLK az órajel forrása
+                ID_0 |                 //1:1 osztás beállítása
+                MC_1 |                 //Felfelé számláló mód
+                TACLR;                 //TAR törlése
+
   while(1) {
-    delay_ms(1000);
-    data = ADC_single_meas_REF1_5V(INCH_5);
+    ADC_multi_meas_REF1_5V(INCH_5,adc_data,NDATA); //A5 csatorna mérése
+    data = avg(adc_data,NDATA);        //Az eredmények átlagolása 
     sw_uart_puts("chan 5 = ");
     sw_uart_out4hex(data);
     temp = (int32_t)data*1500L/1023;   //A mV-okban mért feszültség
     sw_uart_outdec(temp,3);            //kiírás 3 tizedesre
-    sw_uart_puts("V chan 10 = ");      
-    data = ADC_single_meas_REF1_5V(INCH_10);
+    sw_uart_puts("V temp = ");
+    sw_uart_outdec(temp-500L,1);       //A TC1047A hõmérsékletének kiíratása
+    sw_uart_puts("C chan 10 = ");      
+    ADC_multi_meas_REF1_5V(INCH_10,adc_data,NDATA); //Mérés a belsõ hõmérõvel
+    data = avg(adc_data,NDATA);        //Az eredmények átlagolása
     sw_uart_out4hex(data);   
     temp = ((int32_t)data*270687L - 182023932L) >> 16;  
     sw_uart_puts(" temp = "); 
-    sw_uart_outdec(temp,1);       
+    sw_uart_outdec(temp,1);            //A hõmérséklet kiíratása 1 tizedesre
     sw_uart_puts(" C\r\n");   
-    delay_ms(1000);    
+    delay_ms(2000);                    //2 s késleltetés  
   }
+}
+
+//----------------------------------------------------------------------
+// ADC10 megszakítás kiszolgálása: CPU felébresztése a méréssorozat végén
+//----------------------------------------------------------------------
+#pragma vector = ADC10_VECTOR
+__interrupt void ADC10_ISR (void)      //A jelzõbit automatikusan törlõdik
+{
+  __low_power_mode_off_on_exit();      //Felébresztjük az alvó CPU-t
 }

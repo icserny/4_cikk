@@ -6,11 +6,11 @@
 <li>4_ADC_simple        Egyszerû egycsatornás mérések az ADC-vel (Vref = VCC)
 <li>4_ADC_simple_ref1   Egyszerû egycsatornás mérések az ADC-vel (Vref = 1.5V)
 <li>4_ADC_simple_ref2   Egyszerû egycsatornás mérések az ADC-vel (Vref = 2.5V)
-<li>4_distance          Timer_A Capture demó (SR-HC04 ultrahangos távolságmérõ)
-<li>4_hw_uart_buf       Hardveres, szoftveresen bufferelt UART kezelés
-<li>4_nmi               Az RST bemenet használata NMI megszakításként
-<li>4_pinosc_02         Kapacitív érzékelés 4 bemeneten a Pin Oscillator funkció használatával
+<li>4_ADC_interrupt     Egyszerû egycsatornás mérés, ADC megszakítása használatával (Vref = VCC)
+<li>4_ADC_pwm1          LED PWM analóg vezérléssel (kitöltés frissítés Timer megszakításban) 
+<li>4_ADC_pwm2          LED PWM analóg vezérléssel (kitöltés frissítés ADC megszakításban)
+<li>4_ADC_pwm3          LED PWM analóg vezérléssel (kitöltés frissítés hardveresen DTC-vel)
+<li>4_ADC_multi_ref1    Ismételt egycsatornás mérés + DTC, egyszeri triggereléssel (Vref = 1.5V)
+<li>4_adc_multi2_ref1   Ismételt egycsatornás mérés + DTC, hardveres triggereléssel (Vref = 1.5V)
+<li>4_ADC_scan_ref2     Csatornapásztázás + DTC (3 analóg csatorna kezelése, Vref = 2,5V)
 </ul>
-
-
-
